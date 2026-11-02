@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos y modelos (pesados)
+data/
+models/
+*.wav
+*.mp3
+*.mp4
+*.flac
+*.pt
+*.ckpt
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
