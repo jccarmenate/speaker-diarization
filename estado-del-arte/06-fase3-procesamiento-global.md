@@ -36,6 +36,8 @@ Tenemos un **conjunto de embeddings** `e(w,k)`, uno por hablante local activo en
 
 > **Idea clave:** SC y VBx no son peores en abstracto; AHC es el que **mejor encaja con la forma de nuestros datos y con el objetivo de reproducir**.
 
+**El clustering también importa fuera de la diarización.** En verificación de hablantes autosupervisada, se agrupan embeddings sin etiquetas para crear pseudo-etiquetas con las que entrenar. [Fathan & Alam (2024)](https://www.sciencedirect.com/science/article/abs/pii/S0167865524000242), en *Pattern Recognition Letters*, comparan varios algoritmos de clustering para esa tarea y encuentran una **alta correlación entre las métricas de calidad del clustering y el rendimiento final**. Es un argumento más para medir y elegir con cuidado el método de clustering. *(Resumen basado en la reseña del artículo; el texto completo no es de acceso libre.)*
+
 **Matiz importante:** pyannote 4.0 (*community-1*, septiembre 2025) **cambió su clustering por defecto a VBx**, adaptado a estos embeddings locales por investigadores de BUT, y obtiene mejor DER. Por eso VBx queda como **extensión a evaluar más adelante**, no como algo descartado.
 
 ## 6.3 El algoritmo: AHC con enlace de centroides

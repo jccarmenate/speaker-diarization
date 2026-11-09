@@ -50,15 +50,19 @@ La revisión bibliográfica encontró que **el análisis de atributos es el áre
 | Trabajo | Qué muestra | Relevancia para AVA |
 |---------|-------------|---------------------|
 | [Raj et al., 2019 — *Probing the Information Encoded in X-vectors*](https://arxiv.org/abs/1909.06351) | Los embeddings de hablante (x-vectors) codifican, además de la identidad, sexo, canal, contenido léxico y más; se recuperan con clasificadores simples sobre ellos. | Justifica el uso de **sondas lineales** sobre nuestros embeddings. |
+| [Chiu et al., 2025 — *A Large-Scale Probing Analysis of Speaker-Specific Attributes in Self-Supervised Speech Representations*](https://arxiv.org/abs/2501.05310) | Sondeo capa por capa de 11 modelos autosupervisados (SSL), midiendo identidad del hablante y atributos acústicos, prosódicos y paralingüísticos. Las primeras capas codifican la acústica básica y las **capas intermedias, los rasgos abstractos**. Para varios atributos, esas capas intermedias dan **mejores sondas que los embeddings de hablante especializados**. | Sugiere comparar dos entradas para las sondas de AVA: nuestros embeddings ResNet34 y las **capas intermedias de un modelo SSL** (por ejemplo WavLM). |
+| [Yang, Thebaud & Dehak, 2025 — *Demographic Attributes Prediction from Speech Using WavLM Embeddings*](https://arxiv.org/abs/2502.12007) | Un clasificador general sobre rasgos de **WavLM** predice edad, sexo, lengua materna, nivel educativo y país. Reporta **MAE de 4.94 años** en edad y **más de 99.81 % de exactitud** en sexo, con mejoras de hasta 30 % relativo en MAE sobre trabajos previos. | Es la **referencia cuantitativa** más directa para AVA: da valores concretos con los que comparar nuestras sondas. |
 | [Burkhardt et al., 2023 — *Speech-based Age and Gender Prediction with Transformers*](https://arxiv.org/abs/2306.16962) (audEERING) | wav2vec 2.0 afinado para predecir edad (regresión) y sexo; publican el modelo. | Referencia de **edad y sexo** con modelos SSL afinados. |
 | [Zuluaga-Gomez et al., 2023 — *CommonAccent*](https://arxiv.org/abs/2305.18283) | Clasificación de acentos afinando modelos preentrenados (XLSR, ECAPA) sobre Common Voice. | Referencia para **acento**; usa el mismo corpus que proponemos. |
 | [Ardila et al., 2020 — *Common Voice*](https://arxiv.org/abs/1912.06670) | Corpus multilingüe con metadatos de edad, sexo y acento declarados por los hablantes. | **Datos etiquetados** para entrenar y evaluar AVA, incluido español. |
 
 **Lectura honesta del estado del arte:**
-- **Sexo percibido:** funciona bien con casi cualquier enfoque (incluso una sonda lineal).
-- **Edad:** más difícil; los errores típicos son de varios años y dependen mucho del dominio.
+- **Sexo percibido:** funciona bien con casi cualquier enfoque (incluso una sonda lineal); con WavLM se superan el 99 % de exactitud.
+- **Edad:** más difícil; los mejores resultados recientes con WavLM rondan los **5 años de error medio**, y dependen mucho del dominio.
 - **Acento:** depende fuertemente de tener datos etiquetados de las variedades que interesan.
 - **Estilo y fluidez:** es lo más fiable, porque se mide directamente de las salidas del pipeline, sin inferir nada sobre la persona.
+
+**Implicación para el diseño de AVA.** Los dos trabajos de 2025 apuntan en la misma dirección: los modelos autosupervisados como WavLM, y en especial sus **capas intermedias**, guardan más información de atributos que los embeddings entrenados solo para distinguir personas. Un experimento natural para el proyecto es entrenar la misma sonda sobre (a) el centroide de embeddings ResNet34 de la diarización y (b) el promedio de una capa intermedia de WavLM sobre los turnos del hablante, y comparar UAR y MAE.
 
 ## 8.4 Validación y ética
 

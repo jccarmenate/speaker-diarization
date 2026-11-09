@@ -47,7 +47,7 @@ Ambos confirman que la estructura que reproducimos es la base sobre la que se co
 ## 11.4 Recomendación para el proyecto
 
 1. **Línea base:** reproducir el pipeline 3.1 con los modelos preentrenados, sin ajustar nada.
-2. **Ajuste de hiperparámetros:** optimizar `δ` y `min_cluster_size` con unos pocos audios propios anotados.
+2. **Ajuste de hiperparámetros:** optimizar `δ` y `min_cluster_size` con unos pocos audios propios anotados. Es también una de las recomendaciones de [Amorim et al. (2026)](https://onlinelibrary.wiley.com/doi/10.1111/exsy.70221), que señalan la longitud de la ventana y los umbrales de detección de voz como hiperparámetros a ajustar.
 3. **(Opcional) Afinar la segmentación** con el tutorial de pyannote si hay datos anotados y GPU.
 4. **AVA:** entrenar sondas sobre los embeddings con Common Voice; afinar wav2vec 2.0 solo si las sondas no bastan.
 

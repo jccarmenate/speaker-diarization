@@ -56,11 +56,24 @@ Son la dirección más activa del área, pero caros de entrenar y difíciles de 
 
 ## 12.4 Limitaciones actuales de la diarización
 
+### Estudio de referencia: *On the Limitations of Speaker Diarization* (2026)
+
+[Amorim, Pimentel & Rudzicz (2026)](https://onlinelibrary.wiley.com/doi/10.1111/exsy.70221), publicado en *Expert Systems*, evalúa **cinco pipelines abiertos**, tanto de solo diarización como conjuntos de ASR + diarización, sobre datasets heterogéneos, para encontrar qué limita su precisión. Sus conclusiones:
+
+- Los sistemas **de solo diarización y los conjuntos** (ASR + diarización) son **competitivos entre sí** en escenarios no supervisados. Esto respalda la decisión de DASR de usar una cascada en lugar de un modelo conjunto.
+- **Dar el número de hablantes** como entrada **no mejora el rendimiento de forma consistente**.
+- Las propiedades del audio que **más perjudican** son la **duración corta** del audio y una **baja relación voz-ruido (SNR)**.
+- Recomiendan: aprender mejores **representaciones de voz**, **preprocesar para quitar ruido** y **ajustar hiperparámetros** como la longitud de la ventana y los umbrales de detección de voz.
+
+### Tabla de limitaciones
+
 Problemas que siguen abiertos incluso en los mejores sistemas, y cómo afectan a DASR:
 
 | Limitación | Descripción | En DASR |
 |------------|-------------|---------|
 | **Habla perdida** | El benchmark de 2025 encontró que la principal fuente de error es la voz no detectada, por encima de la confusión de hablantes. | Depende de la Fase 1: el fine-tuning de la segmentación es la palanca principal. |
+| **Ruido (SNR bajo) y audios cortos** | Amorim et al. (2026) los identifican como las propiedades que más dañan la diarización. | Considerar un preprocesado de reducción de ruido en `Core/` y reportar resultados por nivel de SNR y duración. |
+| **Número de hablantes conocido** | Darlo como entrada no mejora de forma consistente (Amorim et al., 2026). | El AHC puede parar en `K` si se conoce, pero conviene evaluar ambas opciones en lugar de asumir que ayuda. |
 | **Muchos hablantes** | Todos los sistemas empeoran con más de 4–5 hablantes. | La segmentación de pyannote admite 3 por ventana (10 s), pero el clustering no tiene límite global. |
 | **Solapamiento** | Sigue siendo la parte más difícil. | Powerset admite 2 a la vez; un tercero simultáneo se pierde. |
 | **Turnos muy cortos** | "Sí", "ajá": poca voz para un embedding fiable. | Mitigado por la máscara de ventana completa (Fase 2), no resuelto. |
