@@ -1,38 +1,63 @@
-# Estado del arte: identificación de hablantes y diarización
+# Estado del arte y marco teórico: proyecto DASR
 
-Revisión actualizada a noviembre de 2026 para el proyecto final de Machine Learning.
+**Reconocimiento automático del habla y diarización de hablantes: del audio a la transcripción por hablante y al análisis de atributos vocales.**
 
-**Objetivo del proyecto:** dado un audio o video, saber **quién** habló, **qué** dijo, **cuándo** lo dijo y **dónde** (en qué parte del archivo y, en video, cuál de las personas en pantalla).
+Este documento desarrolla por escrito la presentación *DASR – marco teórico* de Melissa Maureen. Sigue su mismo orden (cinco bloques, tres fases de diarización), amplía la explicación de cada diapositiva a partir de sus notas y añade lo que el formato de presentación no permite: más contexto, ejemplos resueltos, la correspondencia con el código de pyannote y el panorama de alternativas.
 
-## Índice por subtemas
+## La idea en una frase
 
-| # | Archivo | Qué cubre |
-|---|---------|-----------|
-| 1 | [Problema y tareas](01-problema-y-tareas.md) | Cómo se descompone "quién dijo qué, cuándo y dónde" en tareas de ML |
-| 2 | [Pipeline modular](02-pipeline-modular.md) | VAD, segmentación, embeddings y clustering (pyannote, VBx) |
-| 3 | [Diarización end-to-end](03-end-to-end.md) | EEND, EEND-VC, TS-VAD, powerset, Sortformer, DiariZen, Nemotron 3 |
-| 4 | [Embeddings e identificación](04-embeddings-e-identificacion.md) | x-vectors, ECAPA-TDNN, ResNet, CAM++, WavLM; identificar a personas conocidas |
-| 5 | [Diarización + transcripción](05-diarizacion-y-transcripcion.md) | Whisper/WhisperX, DiCoW, DiarizationLM, Speech LLMs |
-| 6 | [Audiovisual y localización](06-audiovisual-y-localizacion.md) | Detección de hablante activo, diarización audiovisual, el "dónde" |
-| 7 | [Datasets y métricas](07-datasets-y-metricas.md) | DER, JER, WDER, cpWER/tcpWER, EER; corpus, incluido español |
-| 8 | [Herramientas](08-herramientas.md) | Toolkits y modelos preentrenados disponibles |
-| 9 | [Brechas y dirección del proyecto](09-brechas-y-direccion.md) | Problemas abiertos y una propuesta de pipeline para el proyecto |
-| — | [Referencias](referencias.md) | Bibliografía completa con enlaces |
+Partimos del audio y obtenemos dos salidas que comparten el eje del tiempo: **qué se dijo** (ASR) y **quién habló y cuándo** (diarización). Las unimos palabra por palabra y, con la voz de cada hablante, estimamos **atributos vocales potenciales** (sexo percibido, grupo de edad, acento, estilo de habla).
 
-## Resumen en cinco puntos
+La herramienta de referencia es [pyannote.audio](https://github.com/pyannote/pyannote-audio), pero **no la usamos como caja negra**: reproducimos su pipeline paso a paso en nuestro propio código (DASR) para poder explicar y verificar cada tensor intermedio.
 
-1. **La diarización no está resuelta.** En el benchmark independiente más reciente (ETH Zurich, 2025), el mejor sistema comercial queda en 11.2% de DER y el mejor abierto (DiariZen) en 13.3%. La mayoría de los errores vienen de habla no detectada y de confundir hablantes cuando hay muchos.
-2. **El estado del arte es híbrido.** Los mejores sistemas abiertos combinan un segmentador neuronal *end-to-end* en ventanas cortas (WavLM + Conformer con pérdida *powerset*) con *clustering* global (VBx o aglomerativo). Esa es la línea de pyannote y de DiariZen.
-3. **Lo nuevo es streaming y más hablantes.** NVIDIA pasó de Sortformer (4 hablantes) a Streaming Sortformer y en septiembre de 2026 a Nemotron 3 Diarization (8 hablantes, latencia desde 0.32 s, pesos abiertos).
-4. **"Quién dijo qué" se está unificando.** Cada vez más trabajos (2025–2026) hacen diarización y ASR juntos: Whisper condicionado por diarización (DiCoW) o *Speech LLMs* que generan texto con etiquetas de hablante (SpeakerLM, el paper 2507.02927).
-5. **El video ayuda menos de lo esperado en reuniones.** En el reto MISP 2025, los ganadores reportan que la información visual casi no mejora a un buen sistema solo-audio. Para el "dónde" en video sigue siendo necesaria la detección de hablante activo.
+## Por qué esta propuesta
 
-## Revisión de los links que pasaste
+La propuesta se eligió tras revisar papers de 2023 a 2026 sobre diarización, ASR y *fine-tuning* en este contexto. Los criterios fueron:
 
-| Link | ¿Sirve? | Qué es |
-|------|---------|--------|
-| [arxiv.org/abs/2507.02927](https://arxiv.org/abs/2507.02927) | **Sí** | *A Unified Speech LLM for Diarization and Speech Recognition in Multilingual Conversations* (Saengthong et al., junio 2025). Un solo modelo hace diarización + ASR, para la Task II del reto MLC-SLM. Mejora 54.87% relativo en tcpWER/tcpCER sobre el baseline y queda 8.º. Sirve como referencia de la línea "Speech LLM" (subtema 5). |
-| [arxiv.org/abs/2507.02927?utm_source=chatgpt.com](https://arxiv.org/abs/2507.02927?utm_source=chatgpt.com) | Duplicado | Es el mismo paper. El `?utm_source=chatgpt.com` es solo un parámetro de rastreo; conviene citarlo sin él. |
-| [isca-archive.org/…/bredin23_interspeech](https://www.isca-archive.org/interspeech_2023/bredin23_interspeech.html) | **Sí, es clave** | *pyannote.audio 2.1 speaker diarization pipeline: principle, benchmark, and recipe* (Bredin, Interspeech 2023). Describe el pipeline de tres etapas (segmentación local → embeddings → clustering aglomerativo) que es la base de pyannote y de DiariZen. Incluye una receta para adaptarlo a datos propios. Fue 1.º en Ego4D 2022 y Albayzin 2022. |
+- **Trabajable** por el equipo en el tiempo del curso.
+- **Cercana al curso**: redes neuronales, embeddings, clustering, métricas.
+- **Comprensible**: algoritmos y decisiones que se pueden explicar sin cajas negras.
+- **Moderna**: es la arquitectura de los sistemas abiertos más usados hoy (pyannote 3.x/4.0, WhisperX).
+- **Con código público**: pyannote.audio está en GitHub, así que podemos ver cómo resuelven cada paso y comparar.
 
-**Ojo:** el paper de pyannote 2.1 ya no describe la versión actual. Hoy se usa pyannote 3.1 / *community-1* (pyannote.audio 4.0), que cambia el segmentador a *powerset* y los embeddings a ResNet de WeSpeaker. El principio es el mismo, así que sigue sirviendo para explicar el método.
+## Índice
+
+| Bloque del PPT | Archivo | Qué responde |
+|----------------|---------|--------------|
+| Visión general | [1. Visión general y arquitectura](01-vision-general.md) | ¿Qué queremos obtener y cómo está organizado el código? |
+| Fundamentos | [2. ASR: del audio al texto](02-asr.md) | ¿Qué se dijo? |
+| Fundamentos | [3. Diarización: fundamentos](03-diarizacion-fundamentos.md) | ¿Quién habló y cuándo? ¿Por qué el enfoque de pyannote? |
+| Diarización en 3 fases | [4. Fase 1: preparación](04-fase1-preparacion.md) | Segmentación local y segmentación binaria |
+| Diarización en 3 fases | [5. Fase 2: procesamiento local](05-fase2-procesamiento-local.md) | Un embedding por hablante local, con su voz limpia |
+| Diarización en 3 fases | [6. Fase 3: procesamiento global](06-fase3-procesamiento-global.md) | Clustering AHC con centroides y reconstrucción |
+| Integración y atributos | [7. Fusión ASR + diarización](07-integracion-asr-diarizacion.md) | ¿Quién dijo cada palabra? |
+| Integración y atributos | [8. Atributos vocales (AVA)](08-atributos-vocales.md) | ¿Cómo es la voz de cada hablante? |
+| Implementación | [9. Evaluación y métricas](09-evaluacion.md) | ¿Cómo medimos si funciona? |
+| Implementación | [10. Implementación y plan](10-implementacion-y-plan.md) | Del repositorio de pyannote a nuestros módulos |
+| Complemento | [11. Fine-tuning](11-fine-tuning.md) | ¿Cómo adaptar los modelos a nuestros datos? |
+| Complemento | [12. Contexto, alternativas y limitaciones](12-contexto-alternativas-limitaciones.md) | NeMo, WhisperX, DiariZen, Speech LLMs y límites actuales |
+| — | [Referencias](referencias.md) | Bibliografía con enlaces |
+
+Los archivos 11 y 12 no están en el PPT: recogen el resto de la revisión bibliográfica (fine-tuning, NeMo, limitaciones) para que el estado del arte quede completo.
+
+## Notación usada en todo el documento
+
+| Símbolo | Significado |
+|---------|-------------|
+| `w` | Índice de **ventana** (trozo de 10 s de audio). Hay `C` ventanas en total. |
+| `f` | Índice de **frame** (≈17 ms). Cada ventana tiene `F` = 589 frames. |
+| `k` | Índice de **hablante local** dentro de una ventana (`#1`, `#2`, `#3`). `K` = 3. |
+| `c` | Índice de **hablante global** o clúster (`SPK_A`, `SPK_B`…). |
+| `s(w)f,k` | Probabilidad (0–1) de que el hablante local `k` hable en el frame `f` de la ventana `w`. |
+| `θ` | Umbral de binarización (solo para modelos multilabel). |
+| `b(w)f,k` | Decisión binaria (0/1): ¿habla `k` en el frame `f` de `w`? |
+| `m(w,k)` | Máscara de voz limpia del hablante local `k` en la ventana `w`. |
+| `e(w,k)` | Embedding (huella vocal, 256 dimensiones) del hablante local `k` en la ventana `w`. |
+| `πw(k)` | Asignación: a qué hablante global `c` corresponde el local `k` de la ventana `w`. |
+| `δ` | Umbral de distancia que detiene el clustering aglomerativo. |
+| `Kf` | Número de hablantes simultáneos estimado en el frame `f`. |
+| `S(f,c)` | Puntuación del hablante global `c` en el frame `f`. |
+
+## Figuras
+
+Las figuras de la carpeta [img/](img/) provienen de la presentación. Las dos imágenes promocionales con marca comercial (el esquema de ASR de Deepgram y el banner de WhisperX) no se incluyen; su contenido se explica en texto.
