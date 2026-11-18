@@ -18,8 +18,39 @@ models/
 *.pt
 *.ckpt
 
+# LaTeX (solo se versionan .tex y .pdf)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.synctex.gz
+*.synctex(busy)
+*.fls
+*.fdb_latexmk
+*.bcf
+*.run.xml
+*.blg
+*.idx
+*.ind
+*.ilg
+*.xdv
+*.spl
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+
 # Editor / SO
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+~$*

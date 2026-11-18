@@ -1,0 +1,315 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[spanish]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\onehalfspacing
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0.3em}
+
+\newcommand{\lang}[1]{\textit{#1}}
+
+\begin{document}
+\decimalpoint
+
+%==================================================================
+% HOJA DE PRESENTACIÓN
+%==================================================================
+\begin{titlepage}
+\centering
+\vspace*{1cm}
+{\Large\textbf{Universidad de La Habana}}\\[0.4cm]
+{\large Facultad de Matemática y Computación}\\
+\vfill
+
+{\LARGE\bfseries Reconocimiento automático del habla y diarización de hablantes:\\[0.3cm]
+estado del arte para la transcripción por hablante y el análisis de atributos vocales}\\
+\vfill
+
+{\large\textbf{Integrantes}}\\[0.6cm]
+\begin{tabular}{p{9cm}}
+	\centering
+	Aixa Bazán Rodríguez\\[0.6cm]
+	Juan Carlos Carmenate Díaz\\[0.6cm]
+	Sebastian González Alfonso\\[0.6cm]
+	Amanda Medina Solís\\[0.6cm]
+	Melissa Maureen Sales Brito\\[0.6cm]
+	Lianet Soto Aguirre\\
+\end{tabular}
+
+\vfill
+{\large La Habana, noviembre de 2026}
+\end{titlepage}
+
+%==================================================================
+% ABSTRACTS
+%==================================================================
+\pagenumbering{roman}
+
+\selectlanguage{spanish}
+\begin{abstract}
+\noindent
+Se presenta una revisión del estado del arte en reconocimiento automático del habla (ASR) y diarización de hablantes, orientada a la obtención de transcripciones atribuidas a cada hablante y a la estimación de atributos vocales potenciales a partir del audio. Se describe el reconocimiento del habla mediante modelos Transformer de tipo codificador-decodificador y su refinamiento temporal con alineación forzada, y se analiza en detalle la diarización según el enfoque híbrido de pyannote.audio, que combina una segmentación neuronal local sobre ventanas de diez segundos con un agrupamiento global de representaciones de hablante. Se justifica la elección del agrupamiento aglomerativo jerárquico con enlace de centroides frente al agrupamiento espectral y a VBx, y se examina la fusión de ambas salidas mediante la intersección temporal. Asimismo, se revisan los trabajos sobre sondeo de representaciones de hablante para la predicción de sexo percibido, edad y acento, las métricas de evaluación (WER, DER, UAR y MAE), las estrategias de ajuste fino, las alternativas basadas en NVIDIA NeMo y en modelos conjuntos de diarización y ASR, y las limitaciones documentadas de los sistemas actuales. Se concluye que la arquitectura local-global constituye la base de los sistemas abiertos más competitivos y que las mejoras recientes sustituyen componentes sin alterar dicha estructura.
+
+\medskip
+\noindent\textbf{Palabras clave:} reconocimiento automático del habla, diarización de hablantes, pyannote.audio, representaciones de hablante, agrupamiento jerárquico, atributos vocales.
+\end{abstract}
+
+\selectlanguage{english}
+\begin{abstract}
+\noindent
+This report presents a state-of-the-art review of automatic speech recognition (ASR) and speaker diarization, aimed at producing speaker-attributed transcriptions and estimating potential vocal attributes from audio. Speech recognition based on encoder-decoder Transformer models and its temporal refinement through forced alignment are described, and diarization is analyzed in detail following the hybrid approach of pyannote.audio, which combines local neural segmentation over ten-second windows with global clustering of speaker embeddings. The choice of agglomerative hierarchical clustering with centroid linkage over spectral clustering and VBx is justified, and the fusion of both outputs through temporal intersection is examined. The literature on probing speaker representations for the prediction of perceived sex, age, and accent is reviewed, together with evaluation metrics (WER, DER, UAR, and MAE), fine-tuning strategies, alternatives based on NVIDIA NeMo and on joint diarization and ASR models, and the documented limitations of current systems. It is concluded that the local-global architecture underlies the most competitive open systems and that recent improvements replace individual components without altering that structure.
+
+\medskip
+\noindent\textbf{Keywords:} automatic speech recognition, speaker diarization, pyannote.audio, speaker embeddings, hierarchical clustering, vocal attributes.
+\end{abstract}
+
+\clearpage
+\selectlanguage{spanish}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+%==================================================================
+% 1. INTRODUCCIÓN
+%==================================================================
+\section{Introducción}
+
+El análisis automático de grabaciones de conversaciones requiere responder, de forma conjunta, a tres cuestiones: qué se dijo, quién lo dijo y en qué momento, y qué características presenta la voz de cada participante. La primera cuestión corresponde al reconocimiento automático del habla (ASR, por sus siglas en inglés), la segunda a la diarización de hablantes, y la tercera al análisis de atributos vocales, un área con menor madurez que las anteriores. Este proyecto aborda la integración de estas tres tareas en un único procesamiento que parte de una señal de audio y produce una transcripción atribuida a cada hablante, acompañada de una estimación probabilística de rasgos como el sexo percibido, el grupo de edad y la variedad dialectal.
+
+La arquitectura conceptual considerada se basa en dos ramas independientes que reciben la misma señal. La rama de ASR produce palabras con sus instantes de inicio y fin, mientras que la rama de diarización produce segmentos temporales con una etiqueta anónima de hablante. Dado que ambas salidas comparten el eje temporal, pueden fusionarse asignando a cada palabra el hablante cuyo segmento la contiene. Los vectores de representación de hablante generados durante la diarización se reutilizan, además, para el análisis de atributos, que se realiza por hablante y no por palabra. La independencia de las ramas permite evaluarlas por separado, mediante la tasa de error de palabras (WER) y la tasa de error de diarización (DER), y sustituir cualquiera de ellas sin modificar la otra. Una decisión de diseño adicional consiste en calcular la segmentación una única vez y emplearla tanto como detector de actividad de voz para el ASR como base para la extracción de representaciones en la diarización, lo que evita incorporar un segundo modelo de detección y garantiza que ambas ramas operen sobre la misma delimitación de la voz.
+
+La herramienta de referencia para la diarización es pyannote.audio \cite{bredin2020}, cuyo procedimiento se reproduce módulo a módulo, en lugar de emplearse como biblioteca opaca, con el fin de que cada tensor intermedio pueda explicarse y verificarse. La rama de ASR toma como referencia el enfoque de WhisperX \cite{bain2023}. El presente documento revisa los fundamentos y la literatura que sustentan estas decisiones: la Sección~\ref{sec:asr} trata el reconocimiento del habla, la Sección~\ref{sec:diar} desarrolla la diarización en sus tres fases, la Sección~\ref{sec:integracion} aborda la fusión de salidas, el análisis de atributos y la evaluación, y la Sección~\ref{sec:contexto} examina el ajuste fino, las alternativas y las limitaciones vigentes.
+
+%==================================================================
+% 2. ASR
+%==================================================================
+\section{Reconocimiento automático del habla}
+\label{sec:asr}
+
+El reconocimiento automático del habla transforma una señal acústica en una secuencia de palabras. En los sistemas contemporáneos este proceso se descompone en cuatro etapas sucesivas. En primer lugar, la señal captada por el micrófono se digitaliza como una forma de onda monocanal muestreada a 16~kHz, es decir, 16\,000 valores por segundo, representación de la que resulta difícil extraer información de forma directa. En segundo lugar, la onda se convierte en un espectrograma log-Mel: el audio se divide en ventanas de 25~ms con un avance de 10~ms, se mide la energía en cada banda de frecuencia mediante la transformada de Fourier, las frecuencias se agrupan en bandas de escala Mel (80 en Whisper y 128 en su versión large-v3), que reproduce la mayor resolución perceptiva del oído humano en frecuencias bajas, y se aplica el logaritmo a la energía, dada la percepción aproximadamente logarítmica de la intensidad. El resultado es una imagen tiempo-frecuencia que constituye la entrada efectiva del modelo.
+
+En tercer lugar, un modelo neuronal procesa dicha representación. Whisper \cite{radford2023} emplea una arquitectura Transformer de tipo codificador-decodificador, en la que el codificador transforma el espectrograma en una secuencia de representaciones y el decodificador genera el texto token a token, como un modelo de lenguaje condicionado por el audio. El modelo fue entrenado con 680\,000 horas de audio multilingüe con supervisión débil, obtenido de subtítulos disponibles en internet, lo que le confiere robustez frente al ruido, a los acentos y a diversos idiomas, entre ellos el español. En cuarto lugar, la decodificación selecciona la secuencia de palabras más probable, ya sea de manera voraz, eligiendo en cada paso el token de mayor probabilidad, o mediante búsqueda en haz, que mantiene las $n$ mejores hipótesis parciales a un mayor costo computacional y con frecuencia con mejor calidad textual.
+
+Las marcas temporales que produce Whisper se asocian a segmentos completos y presentan baja precisión, lo cual resulta insuficiente cuando se requiere atribuir cada palabra a un hablante. WhisperX \cite{bain2023} resuelve esta limitación mediante un procedimiento de tres pasos que se adopta como referencia. El primero es la detección de actividad de voz, necesaria para evitar la transcripción de silencios o ruido, donde Whisper tiende a generar texto inexistente, fenómeno conocido como alucinación. En el presente proyecto no se incorpora un detector adicional: se reutiliza la segmentación binaria de la diarización, de modo que se considera que existe voz en un fotograma si al menos un hablante local se encuentra activo. El segundo paso es la transcripción de cada región de voz detectada con Whisper. El tercero es la alineación forzada, en la cual un modelo fonético basado en wav2vec 2.0 \cite{baevski2020} y ajustado con clasificación temporal conexionista (CTC) recibe el audio y el texto ya conocido, y determina el instante exacto de cada palabra. Un modelo CTC predice, para cada fotograma, la probabilidad de cada carácter o de la ausencia de emisión; al ser conocido el texto, basta con hallar, mediante programación dinámica de tipo Viterbi, el camino más probable que recorra los caracteres en orden, y los fotogramas de inicio y fin de cada palabra proporcionan sus tiempos con una precisión de decenas de milisegundos. La salida de la rama es una lista de palabras con instante de inicio, instante de fin y puntuación de confianza. Cabe señalar que, en el caso de Whisper, el cálculo del espectrograma forma parte del propio modelo, por lo que generar los espectrogramas de forma externa antes de la transcripción no modifica el resultado y solo sería pertinente con modelos que reciban rasgos precalculados.
+
+%==================================================================
+% 3. DIARIZACIÓN
+%==================================================================
+\section{Diarización de hablantes}
+\label{sec:diar}
+
+La diarización de hablantes responde a la pregunta de quién habló y en qué momento. Su salida consiste en segmentos temporales con etiquetas anónimas, como \texttt{SPEAKER\_00}, y se representa habitualmente en el formato RTTM, en el que cada línea registra el archivo, el canal, el inicio, la duración y la etiqueta del segmento; este es también el formato de las referencias de los conjuntos de datos públicos, como AMI, DIHARD y VoxConverse, y de las herramientas de evaluación. La tarea agrupa voces sin identificar personas: la asignación de nombres corresponde a la identificación de hablante, que requiere voces registradas previamente. El problema comprende dos componentes, la segmentación, que detecta la presencia de voz y los cambios de hablante, y el agrupamiento, que decide qué segmentos pertenecen a la misma persona sin conocer a priori el número de participantes. Las dificultades clásicas incluyen el solapamiento de voces, los turnos muy breves que aportan poca señal para caracterizar al hablante, el ruido y el habla amortiguada, la similitud entre voces y la necesidad de mantener la identidad en grabaciones de varias horas.
+
+El enfoque clásico consiste en una cascada de etapas: extracción de rasgos, detección de actividad de voz, detección de cambio de hablante, obtención de una representación vectorial por segmento y agrupamiento de dichas representaciones. Esta organización presenta limitaciones estructurales. Cada segmento recibe una única etiqueta, por lo que el solapamiento se ignora o se atribuye erróneamente; los errores de las primeras etapas se propagan sin posibilidad de corrección; la extracción de representaciones sobre segmentos de uno o dos segundos produce huellas vocales ruidosas; y cada módulo se entrena de forma aislada, sin que ninguno optimice el resultado final. La biblioteca pyannote.audio \cite{bredin2020} conserva la estructura modular, pero reemplaza la detección de voz, la detección de cambios y la detección de solapamiento por una única red de segmentación entrenada de extremo a extremo \cite{bredin2021}, capaz de estimar el número de hablantes activos en cada instante, incluidos los casos de solapamiento.
+
+El procedimiento central, descrito por Bredin \cite{bredin2023}, parte de la observación de que la red neuronal es muy precisa en ventanas cortas de diez segundos, pero no puede procesar una hora de audio de una vez ni garantiza que el primer hablante de una ventana coincida con el primero de otra. La solución es híbrida: la red resuelve el instante de habla con alta resolución temporal pero memoria corta, y un agrupamiento global resuelve la identidad con memoria larga pero sin resolución temporal. El procedimiento se organiza en tres fases, que se describen a continuación: la preparación, el procesamiento local y el procesamiento global.
+
+\subsection{Fase 1: preparación}
+
+La preparación recorre el audio con una ventana de 10~s que avanza en pasos de 1~s, de modo que ventanas consecutivas se solapan en un 90\,\% y cada instante es analizado por aproximadamente diez ventanas distintas. Esta redundancia otorga robustez, pues el error de una ventana puede compensarse con las restantes al promediar en la fase final. En pyannote 3.1 el paso se controla mediante el parámetro \texttt{segmentation\_step}, fijado en 0.1 veces la duración de la ventana.
+
+Cada ventana es procesada por la red PyanNet, compuesta por una capa SincNet, un long short-term memory (LSTM) bidireccional y capas lineales. SincNet \cite{ravanelli2018} aprende filtros directamente sobre la forma de onda, con solo dos parámetros por filtro (las frecuencias de corte), lo que acelera el aprendizaje y reduce la necesidad de datos; el LSTM bidireccional modela el contexto temporal anterior y posterior a cada fotograma; y las capas lineales clasifican cada fotograma. La resolución resultante es de 589 fotogramas por ventana, equivalente a unos 17~ms por fotograma. En el modelo \texttt{segmentation-3.0} la salida es de tipo \emph{powerset} \cite{plaquet2023}: en lugar de una probabilidad independiente por hablante, se predice una entre siete clases que corresponden al silencio, a cada uno de los tres hablantes locales y a cada pareja de ellos, de modo que el solapamiento se aprende explícitamente como clase propia. Las restricciones de diseño limitan a tres los hablantes por ventana y a dos los hablantes simultáneos, condiciones que se satisfacen casi siempre en diez segundos de conversación real. Frente al enfoque multietiqueta, que exige un umbral $\theta$ sensible para cada hablante, la formulación powerset permite seleccionar la clase de máxima probabilidad sin ajustar umbral alguno. La salida es un tensor de ventanas por fotogramas por hablantes locales, cuyos elementos $s^{(w)}_{f,k}\in[0,1]$ expresan la probabilidad de que el hablante local $k$ se encuentre activo en el fotograma $f$ de la ventana $w$.
+
+Un aspecto esencial es que la red numera los hablantes de forma arbitraria en cada ventana, por lo que el primer hablante de una ventana puede corresponder a una persona distinta que el primero de la ventana siguiente. Este es el problema de permutación, y su resolución exige hallar, para cada ventana, una función $\pi_w:\{1,\dots,K\}\to\{A,B,\dots\}$ que asocie cada índice local con una identidad global. Dicha función no puede deducirse del índice, sino de la comparación de voces, lo que motiva las dos fases siguientes. Se impone además la restricción lógica de que dos hablantes locales distintos de una misma ventana no pueden corresponder a la misma persona global.
+
+Las probabilidades continuas se convierten en decisiones discretas mediante la binarización
+\begin{equation}
+b^{(w)}_{f,k}=\begin{cases}1 & \text{si } s^{(w)}_{f,k}>\theta,\\ 0 & \text{en otro caso,}\end{cases}
+\end{equation}
+que en los modelos multietiqueta se aplica preferiblemente con histéresis, con un umbral de activación superior al de desactivación para evitar oscilaciones, y que en los modelos powerset se reduce a convertir la clase más probable de cada fotograma a su forma multietiqueta. Posteriormente se eliminan las activaciones y los silencios de duración inferior a un mínimo establecido. La binarización resulta necesaria porque varias operaciones posteriores requieren decisiones discretas: la construcción de máscaras de voz limpia, el conteo entero de hablantes por fotograma, la delimitación de las regiones de voz para el ASR, la exclusión de los hablantes locales que nunca se activan y la auditoría de los resultados frente a las referencias. Las probabilidades no se descartan, ya que se emplean en la reconstrucción final para determinar qué clústeres se encuentran activos.
+
+\subsection{Fase 2: procesamiento local}
+
+El objetivo de la segunda fase es obtener, en cada ventana, un vector de representación por cada hablante local activo. Un embedding de hablante es un vector, de 256 dimensiones en este caso, que resume las características de una voz, de manera que voces de una misma persona producen vectores cercanos y voces distintas, vectores alejados. A diferencia del enfoque clásico, que extrae un embedding por cada segmento corto y continuo de uno o dos segundos independientemente de quién hable, el enfoque de pyannote calcula un embedding por hablante local utilizando únicamente los fotogramas en que este habla y ningún otro lo hace. La máscara de voz limpia del hablante $k$ en la ventana $w$ se define como
+\begin{equation}
+m^{(w,k)}_{f}=b^{(w)}_{f,k}\prod_{k'\neq k}\bigl(1-b^{(w)}_{f,k'}\bigr),
+\end{equation}
+y el embedding se calcula únicamente sobre el audio enmascarado,
+\begin{equation}
+e^{(w,k)}=\mathrm{Emb}\bigl(x^{(w)}\odot m^{(w,k)}\bigr),
+\end{equation}
+donde $x^{(w)}$ es la señal de la ventana y $\odot$ denota el producto elemento a elemento. Los fotogramas seleccionados no necesitan ser contiguos, pues se concatena toda la voz limpia del hablante dentro de la ventana. De este modo se aprovechan hasta diez segundos de voz y se excluye el solapamiento, que de otro modo produciría una representación contaminada por dos voces. Si tras eliminar el solapamiento resulta menos voz de la que requiere el modelo de embedding, se emplea la máscara completa para no perder al hablante, y los hablantes inactivos reciben un valor indefinido que se ignora durante el agrupamiento.
+
+El modelo de embedding utilizado en pyannote.audio~3.1 es WeSpeaker ResNet34 \cite{wang2023}, una red convolucional bidimensional sobre bancos de filtros, entrenada sobre VoxCeleb para clasificar hablantes con una pérdida de margen angular. Tras el entrenamiento se descarta la capa de clasificación y se utiliza la penúltima capa como representación. El resultado de la fase es un tensor de ventanas por hablantes locales por 256 dimensiones.
+
+\subsection{Fase 3: procesamiento global}
+
+La tercera fase asigna cada embedding a un hablante global. Los embeddings no forman una secuencia regular, pues cada ventana aporta entre cero y tres de ellos, las ventanas se solapan y existen fotogramas excluidos. Esta característica condiciona la elección del método de agrupamiento. El agrupamiento espectral no exige orden cronológico, pero estima el número de hablantes a partir de la brecha entre autovalores, criterio inestable con pocos embeddings o con hablantes desbalanceados, que requiere refinar la matriz de afinidad con hiperparámetros poco interpretables y que tiene un costo cúbico en el número de embeddings. VBx \cite{landini2022} modela los vectores como una cadena de Markov de hablantes mediante inferencia variacional, pero su formulación original supone una secuencia de embeddings extraídos con paso fijo y en orden cronológico, necesita un modelo PLDA entrenado y más hiperparámetros, y suele inicializarse con agrupamiento jerárquico. El agrupamiento aglomerativo jerárquico con enlace de centroides (UPGMC) opera sobre un conjunto desordenado, utiliza un umbral de distancia $\delta$ interpretable como criterio de parada, no exige conocer el número de hablantes, es determinista y admite restricciones por ventana. Esta última forma constituye la receta de pyannote 3.1, versión en la que basamos nuestra implementación. La relevancia de la calidad del agrupamiento se evidencia también en la verificación de hablante autosupervisada, donde Fathan y Alam \cite{fathan2024} comparan algoritmos de agrupamiento para generar pseudoetiquetas y reportan una alta correlación entre las métricas de calidad del agrupamiento y el rendimiento final. Debe señalarse que pyannote 4.0 (\emph{community-1}, septiembre de 2025) adoptó VBx como método de agrupamiento por defecto, adaptado a estos embeddings locales por investigadores de BUT, con una mejora del DER; por este motivo VBx se considera una extensión a evaluar y no una alternativa descartada.
+
+El algoritmo inicializa cada embedding normalizado ($\lVert e\rVert=1$) como un clúster propio, lo que hace que la distancia euclideana se comporte como una distancia angular. La distancia entre dos grupos se define como la distancia entre sus centroides,
+\begin{equation}
+d(A,B)=\lVert\mu_A-\mu_B\rVert,
+\end{equation}
+y en cada iteración se fusiona el par más cercano, cuyo nuevo centroide es el promedio ponderado por el tamaño de los grupos,
+\begin{equation}
+\mu_{A\cup B}=\frac{n_A\mu_A+n_B\mu_B}{n_A+n_B}.
+\end{equation}
+El proceso se detiene cuando la menor distancia entre centroides supera $\delta$, de modo que este umbral determina el número de hablantes resultante: valores bajos separan en exceso y valores altos mezclan voces distintas. Si se conoce el número de hablantes, el proceso puede detenerse al alcanzarlo. Los clústeres con menos de \texttt{min\_cluster\_size} embeddings se consideran poco fiables y sus miembros se reasignan al centroide mayor más cercano, y la asignación final se realiza ventana por ventana con el algoritmo húngaro, a fin de respetar la restricción de que dos hablantes locales de una misma ventana no compartan identidad global. Los valores de pyannote 3.1 son $\delta\approx0.7046$ y \texttt{min\_cluster\_size}~$=12$, según coinciden diversas copias públicas de la configuración; cuando existen muy pocos embeddings, el segundo parámetro se reduce automáticamente a $\max(1,\mathrm{round}(0.1N))$.
+
+La preferencia por el enlace de centroides responde al comportamiento de las alternativas. El enlace simple es susceptible al encadenamiento, pues un embedding ruidoso puede unir dos voces distintas. El enlace completo impide la fusión por la presencia de un único atípico y tiende a sobreestimar el número de hablantes. El enlace promedio constituye el competidor más cercano, aunque penaliza a los hablantes con alta variabilidad interna y presenta un costo de $O(n_A n_B)$. El enlace de Ward basado en la varianza favorece grupos de tamaño similar, condición poco realista en conversaciones donde predomina un hablante, y su costo creciente con el tamaño del grupo hace perder significado a un umbral fijo. El enlace de centroides, en cambio, compara prototipos de voz, promedia el ruido individual de los embeddings y confiere a $\delta$ un significado estable sobre la esfera unitaria; coincide, además, con la lógica de la reasignación posterior por centroide. Sus limitaciones son la posible aparición de inversiones en el dendrograma y su validez exclusiva con distancia euclideana, razón por la cual los embeddings se normalizan previamente. El equipo de trabajo observó, en una validación preliminar, el mejor DER con este enlace, resultado que deberá documentarse con sus valores numéricos en el informe final.
+
+Una vez determinada la correspondencia entre hablantes locales y globales, la diarización final se reconstruye fotograma a fotograma. En primer lugar se estima el número de hablantes simultáneos como
+\begin{equation}
+K_f=\operatorname{round}\!\Bigl(\frac{1}{|W_f|}\sum_{w\in W_f}\sum_{k}b^{(w)}_{f,k}\Bigr),
+\end{equation}
+donde $W_f$ es el conjunto de ventanas que cubren el fotograma $f$ y, siguiendo la implementación de pyannote, se descarta previamente el 10\,\% de cada borde de ventana, donde la red dispone de menos contexto. En segundo lugar se calcula la puntuación instantánea de cada clúster,
+\begin{equation}
+S(f,c)=\sum_{w\in W_f}\ \sum_{k:\,\pi_w(k)=c}s^{(w)}_{f,k},
+\end{equation}
+y se seleccionan en cada fotograma los $K_f$ clústeres de mayor puntuación. Finalmente, los índices de fotograma se convierten a tiempo mediante $t_f=t_0+f\Delta$, con $\Delta\approx17$~ms, y los fotogramas contiguos de un mismo hablante se unen en turnos. En la implementación de pyannote se toma el máximo, dentro de cada ventana, de las probabilidades de los locales asignados a un clúster y luego se suman las ventanas; dado que el algoritmo húngaro impide que dos locales de una misma ventana pertenezcan al mismo clúster, el resultado coincide con la fórmula anterior. La segmentación binaria determina así cuántos hablantes están activos, y la puntuación de los clústeres, cuáles. Si se impone $K_f\le1$, se obtiene un modo exclusivo con un único hablante por instante, disponible en pyannote 4.0 como salida independiente y de utilidad para la fusión con el ASR.
+
+%==================================================================
+% 4. INTEGRACIÓN, ATRIBUTOS Y EVALUACIÓN
+%==================================================================
+\section{Integración, atributos vocales y evaluación}
+\label{sec:integracion}
+
+La fusión de las salidas del ASR y de la diarización se realiza como una unión temporal entre dos tablas de intervalos. A cada palabra $w_i$ con intervalo $[t^{ini}_i,t^{fin}_i]$ se le asigna el hablante cuyos turnos presentan la mayor intersección temporal con dicho intervalo:
+\begin{equation}
+\mathrm{hablante}(w_i)=\arg\max_{c}\bigl|[t^{ini}_i,t^{fin}_i]\cap\mathrm{turnos}(c)\bigr|.
+\end{equation}
+Si una palabra no intersecta ningún turno, por ejemplo cuando la diarización recortó una palabra muy breve, se asigna el turno más cercano en el tiempo; si coinciden dos hablantes activos, se recurre a la diarización exclusiva para eliminar la ambigüedad; y las palabras consecutivas del mismo hablante se agrupan en frases para producir una transcripción en formato de guion. Este procedimiento es el empleado por WhisperX y presenta limitaciones inherentes a la cascada: las fronteras que determinan el ASR y la diarización no coinciden, por lo que las palabras situadas en un cambio de turno son las más propensas a error, y los tramos de voz no detectados por la diarización se asignan al turno más próximo, que puede pertenecer a otra persona. No obstante, la evaluación de cinco sistemas abiertos realizada por Amorim et al. \cite{amorim2026} halló que los sistemas de solo diarización y los sistemas conjuntos con ASR son competitivos entre sí, por lo que la cascada no parte en desventaja.
+
+El análisis de atributos vocales potenciales se realiza una vez identificados los segmentos de cada hablante global y tiene carácter experimental, pues sus resultados son inferencias probabilísticas sobre la voz y no la identidad declarada de la persona. Los atributos considerados son el sexo percibido, que se relaciona con la frecuencia fundamental y con los formantes asociados a la longitud del tracto vocal; el grupo de edad, vinculado a la inestabilidad de la frecuencia (\lang{jitter}) y de la amplitud (\lang{shimmer}), a la relación armónico-ruido y a la velocidad de habla; el acento o variedad dialectal, asociado a rasgos fonéticos y prosódicos; y el estilo y la fluidez, que se calculan directamente de las salidas del ASR y de la diarización sin necesidad de modelos adicionales. Para cada hablante global se construye una representación formada por el centroide de sus embeddings locales, rasgos acústicos interpretables y rasgos de habla, sobre la cual se entrenan modelos de complejidad creciente, desde sondas lineales sobre los embeddings hasta perceptrones multicapa y modelos autosupervisados ajustados.
+
+La literatura respalda esta propuesta con matices. Raj et al. \cite{raj2019} demostraron que los x-vectors codifican, además de la identidad, el sexo, el canal y el contenido léxico, y que dicha información puede recuperarse con clasificadores simples. Chiu et al. \cite{chiu2025} realizaron un sondeo capa por capa de once modelos autosupervisados y encontraron que las capas intermedias codifican los rasgos abstractos y, para varios atributos, producen sondas superiores a las de los embeddings de hablante especializados. Yang, Thebaud y Dehak \cite{yang2025} predijeron edad, sexo, lengua materna, nivel educativo y país a partir de representaciones de WavLM, con un error absoluto medio de 4.94 años en la edad y una exactitud superior al 99.81\,\% en el sexo. Burkhardt et al. \cite{burkhardt2023} publicaron un modelo de wav2vec 2.0 ajustado para edad y sexo, y Zuluaga-Gomez et al. \cite{zuluagagomez2023} abordaron la clasificación de acentos mediante modelos preentrenados ajustados sobre Common Voice \cite{ardila2020}, corpus multilingüe con metadatos de edad, sexo y acento declarados. En conjunto, el sexo percibido se resuelve con casi cualquier enfoque, la edad es más difícil y depende del dominio, el acento exige datos etiquetados de las variedades de interés y el estilo de habla es el rasgo más fiable por derivarse directamente de las salidas del sistema. Estos resultados sugieren comparar sondas entrenadas sobre los embeddings ResNet34 de la diarización con sondas entrenadas sobre capas intermedias de un modelo autosupervisado como WavLM. La validación exige particiones por hablante, de modo que ninguno aparezca simultáneamente en entrenamiento y prueba, pues de lo contrario el modelo aprende a reconocer personas y el rendimiento se sobreestima; exige también el reporte de probabilidades en lugar de etiquetas categóricas, la evaluación por subgrupos para detectar sesgos y la consideración de que el sexo de la voz es una percepción acústica y no el género del hablante.
+
+La evaluación de cada rama emplea una métrica específica. En el ASR se utiliza la tasa de error de palabras,
+\begin{equation}
+\mathrm{WER}=\frac{S+D+I}{N},
+\end{equation}
+donde $S$, $D$ e $I$ son las sustituciones, los borrados y las inserciones, y $N$ el número de palabras de la referencia; puede superar el 100\,\% y requiere normalizar previamente el texto. En la diarización se emplea la tasa de error de diarización,
+\begin{equation}
+\mathrm{DER}=\frac{FA+\mathit{Miss}+\mathit{Conf}}{T},
+\end{equation}
+donde $FA$ es el tiempo de falsa alarma, $\mathit{Miss}$ el de voz no detectada, $\mathit{Conf}$ el de confusión de hablante y $T$ el tiempo total de habla de la referencia. Para calcular la confusión se establece primero la correspondencia óptima entre etiquetas del sistema y de la referencia mediante el algoritmo húngaro, dado el carácter anónimo de las primeras. La comparación de cifras exige considerar el margen de tolerancia (\lang{collar}) alrededor de las fronteras y el tratamiento del solapamiento; las cifras publicadas por pyannote corresponden a la configuración más estricta, sin tolerancia, con solapamiento y con detección automática de voz. Se utiliza también la tasa de error de Jaccard (JER), que pondera por igual a todos los hablantes, a diferencia del DER, donde los de menor participación apenas influyen. Los atributos vocales se evalúan con el recall promedio no ponderado (UAR), robusto al desbalance de clases, con la medida F1 y con el error absoluto medio (MAE) en años para la regresión de la edad.
+
+Como valores de referencia se emplean los DER publicados para el pipeline 3.1, que constituye la vara de medida de la reproducción, y para community-1, cuya diferencia ilustra la contribución del agrupamiento VBx y de otras mejoras de la versión 4.0. La Tabla~\ref{tab:der} los resume. Las cifras evidencian la dependencia del DER respecto del tipo de audio, pues la grabación con micrófono de cabeza es considerablemente más sencilla que la realizada con un único micrófono lejano, y las películas constituyen el caso más desfavorable.
+
+\begin{table}[ht]
+\centering
+\caption{DER (\%) publicado por pyannote en la ficha del modelo \texttt{speaker-diarization-community-1} (septiembre de 2025). Menor es mejor.}
+\label{tab:der}
+\begin{tabular}{llrr}
+\toprule
+Conjunto de datos & Tipo de audio & pyannote 3.1 (AHC) & community-1 (VBx) \\
+\midrule
+AISHELL-4 & Reuniones en mandarín & 12.2 & 11.7 \\
+AliMeeting & Reuniones en mandarín & 24.5 & 20.3 \\
+AMI IHM & Reuniones, micrófono de cabeza & 18.8 & 17.0 \\
+AMI SDM & Reuniones, micrófono lejano & 22.7 & 19.9 \\
+AVA-AVD & Películas & 49.7 & 44.6 \\
+CALLHOME & Llamadas telefónicas & 28.5 & 26.7 \\
+DIHARD 3 & Once dominios difíciles & 21.4 & 20.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==================================================================
+% 5. CONTEXTO
+%==================================================================
+\section{Ajuste fino, alternativas y limitaciones}
+\label{sec:contexto}
+
+Los modelos preentrenados se entrenaron principalmente con audio en inglés y chino y con determinados tipos de grabación, por lo que su rendimiento disminuye ante idiomas, micrófonos o dominios distintos. El ajuste fino continúa el entrenamiento con una cantidad reducida de datos propios y constituye la forma de mejora de menor costo. La receta propuesta por Bredin \cite{bredin2023} comprende dos pasos: el ajuste del modelo de segmentación con audio anotado del dominio y la optimización de los hiperparámetros del pipeline, como el umbral de agrupamiento y las duraciones mínimas, sobre un conjunto de desarrollo, con el objetivo de minimizar el DER. Con ella se mejoró el DER en cada dominio evaluado y se obtuvieron los primeros puestos en los retos Ego4D 2022 y Albayzin 2022; en el reto Albayzin 2024 de diarización de televisión española participaron, además, sistemas que ajustaron la segmentación de pyannote con datos en español. La optimización de hiperparámetros requiere pocos audios anotados y ningún entrenamiento de redes, el ajuste de la segmentación ofrece el mayor impacto sobre el DER con un costo moderado, el ajuste del modelo de embeddings exige muchos hablantes etiquetados y rara vez resulta rentable, y el ajuste de Whisper solo se justifica ante vocabulario o acentos muy específicos. Dado que el pipeline se reproduce por módulos, cada ajuste puede aplicarse de forma independiente y su efecto atribuirse a un cambio concreto. La tendencia reciente consiste en ajustar modelos autosupervisados de gran tamaño: DiariZen \cite{han2024,han2025,raghav2026} sustituye SincNet y el LSTM por WavLM ajustado y un Conformer, manteniendo la estructura local-global de pyannote, y su segunda versión poda el modelo para reducir su costo sin pérdida de precisión; adicionalmente, el agrupamiento VBx adoptado por pyannote 4.0 proviene del mismo grupo de investigación.
+
+Entre las alternativas, NVIDIA NeMo ofrece dos líneas de diarización. La primera es una cascada con representaciones de TitaNet \cite{koluguri2021} y un decodificador multiescala (MSDD) \cite{park2022}, que extrae embeddings a varias escalas temporales y aprende a ponderarlas, resolviendo por otra vía el mismo dilema entre identidad fiable y resolución temporal. La segunda es la línea de extremo a extremo con Sortformer \cite{park2024}, que resuelve el problema de permutación ordenando a los hablantes por orden de llegada, con un máximo de cuatro, y cuyas variantes incluyen una versión en tiempo real \cite{streaming2025} y el modelo Nemotron 3 Diarization \cite{nemotron2026}, con soporte de hasta ocho hablantes. No se adopta NeMo como base porque los modelos de extremo a extremo resuelven la permutación dentro de la red y no mediante un algoritmo observable, imponen límites fijos de hablantes y constituyen un conjunto de herramientas voluminoso para reproducir manualmente, aunque se mantienen como comparación externa. Otros antecedentes relevantes son EEND \cite{fujita2019}, origen de la segmentación neuronal de pyannote, y EEND-VC \cite{kinoshita2020}, que aplica la misma idea local-global combinando bloques de EEND con agrupamiento de vectores entre bloques. Un benchmark independiente sobre 196.6 horas en cinco idiomas, incluido el español \cite{benchmark2025}, reportó un DER de 11.2\,\% para el mejor sistema comercial, de 13.3\,\% para el mejor sistema abierto (DiariZen) y un deterioro de Sortformer cuando se superan los cuatro hablantes.
+
+Una línea de investigación activa integra la diarización y el ASR en un único modelo. DiCoW \cite{polok2024} condiciona Whisper con la diarización para transcribir únicamente al hablante objetivo; Saengthong et al. \cite{saengthong2025} emplean un modelo de lenguaje con entrada de audio que genera la transcripción con etiquetas de hablante y alcanzan una mejora relativa de 54.87\,\% sobre la línea base del reto MLC-SLM; SpeakerLM \cite{speakerlm2025} realiza ambas tareas en un modelo multimodal con registro de hablantes conocidos; y DiarizationLM \cite{wang2024dlm} corrige con un modelo de lenguaje las etiquetas de hablante de una salida en cascada, procedimiento aplicable sin reentrenar sistema alguno. Estos enfoques son costosos de entrenar y difíciles de explicar paso a paso, por lo que se consideran trabajo relacionado y posibles extensiones.
+
+Las limitaciones vigentes se documentan en el estudio de Amorim, Pimentel y Rudzicz \cite{amorim2026}, que evaluó cinco sistemas abiertos, tanto de solo diarización como conjuntos, sobre conjuntos de datos heterogéneos. Sus conclusiones indican que ambas familias son competitivas entre sí, que proporcionar el número de hablantes no mejora el rendimiento de forma consistente y que las propiedades del audio más perjudiciales son la corta duración y la baja relación señal-ruido; recomiendan aprender mejores representaciones de voz, preprocesar para reducir el ruido y ajustar hiperparámetros como la longitud de la ventana y los umbrales de detección de voz. El benchmark de 2025 \cite{benchmark2025} identificó además la voz no detectada como principal fuente de error, por encima de la confusión de hablantes, lo que sitúa al ajuste de la segmentación como la principal palanca de mejora. Persisten, asimismo, el deterioro con más de cuatro o cinco hablantes, la dificultad del solapamiento (la formulación powerset admite dos hablantes simultáneos, de modo que un tercero se pierde), la escasa información de los turnos muy breves que la máscara completa mitiga sin resolver, el desajuste de dominio e idioma, la dependencia de un umbral $\delta$ fijo que puede no ser adecuado para todos los audios, las discrepancias de frontera entre ASR y diarización y la escasez de resultados sólidos en atributos vocales fuera de los modelos entrenados específicamente, con el riesgo asociado de sesgo.
+
+%==================================================================
+% CONCLUSIONES
+%==================================================================
+\section*{Conclusiones}
+\addcontentsline{toc}{section}{Conclusiones}
+
+La revisión realizada establece que la obtención de transcripciones atribuidas a hablantes y de atributos vocales potenciales puede abordarse mediante dos ramas independientes, ASR y diarización, que se integran a través del eje temporal. Para la rama de ASR, la combinación de Whisper con alineación forzada basada en wav2vec 2.0, según el enfoque de WhisperX, proporciona los tiempos por palabra necesarios para la atribución. Para la diarización, el enfoque híbrido de pyannote.audio, con segmentación local powerset, extracción de embeddings sobre voz sin solapamiento y agrupamiento global aglomerativo con enlace de centroides, ofrece una estructura explicable y verificable en cada etapa, cuya reproducción modular permite validar los tensores intermedios frente a la implementación de referencia y comparar el DER con los valores publicados para la versión 3.1.
+
+La literatura reciente indica que las mejoras de los sistemas abiertos más competitivos, como la adopción de VBx en pyannote 4.0 y el uso de WavLM ajustado en DiariZen, sustituyen componentes sin alterar la arquitectura local-global, por lo que tales mejoras pueden incorporarse como extensiones posteriores. En el análisis de atributos vocales, los trabajos revisados respaldan el uso de sondas sobre embeddings y sugieren comparar las representaciones de diarización con las capas intermedias de modelos autosupervisados, con validación por hablante y evaluación por subgrupos. Finalmente, las limitaciones documentadas, en particular la voz no detectada, el ruido, la corta duración, el desajuste de dominio e idioma y la sensibilidad al umbral de agrupamiento, orientan la estrategia de adaptación: establecer una línea base con los modelos preentrenados, optimizar los hiperparámetros con datos propios en español y, de disponerse de audio anotado y capacidad de cómputo, ajustar el modelo de segmentación, reportando el DER tras cada etapa para atribuir cada mejora a un cambio concreto.
+
+%==================================================================
+% REFERENCIAS
+%==================================================================
+\begin{thebibliography}{99}
+\addcontentsline{toc}{section}{Referencias}
+
+\bibitem{amorim2026} J.~Amorim, J.~Pimentel y F.~Rudzicz, ``On the limitations of speaker diarization,'' \emph{Expert Systems}, vol.~43, n.º~3, e70221, 2026. doi:10.1111/exsy.70221.
+
+\bibitem{ardila2020} R.~Ardila \emph{et al.}, ``Common Voice: a massively-multilingual speech corpus,'' en \emph{Proc. LREC}, 2020. arXiv:1912.06670.
+
+\bibitem{baevski2020} A.~Baevski, H.~Zhou, A.~Mohamed y M.~Auli, ``wav2vec 2.0: a framework for self-supervised learning of speech representations,'' 2020. arXiv:2006.11477.
+
+\bibitem{bain2023} M.~Bain, J.~Huh, T.~Han y A.~Zisserman, ``WhisperX: time-accurate speech transcription of long-form audio,'' en \emph{Proc. Interspeech}, 2023. arXiv:2303.00747.
+
+\bibitem{benchmark2025} ``Benchmarking diarization models,'' 2025. arXiv:2509.26177.
+
+\bibitem{bredin2020} H.~Bredin \emph{et al.}, ``pyannote.audio: neural building blocks for speaker diarization,'' en \emph{Proc. IEEE ICASSP}, 2020. arXiv:1911.01255.
+
+\bibitem{bredin2021} H.~Bredin y A.~Laurent, ``End-to-end speaker segmentation for overlap-aware resegmentation,'' en \emph{Proc. Interspeech}, 2021. arXiv:2104.04045.
+
+\bibitem{bredin2023} H.~Bredin, ``pyannote.audio 2.1 speaker diarization pipeline: principle, benchmark, and recipe,'' en \emph{Proc. Interspeech}, 2023, pp.~1983--1987. doi:10.21437/Interspeech.2023-105.
+
+\bibitem{burkhardt2023} F.~Burkhardt \emph{et al.}, ``Speech-based age and gender prediction with transformers,'' 2023. arXiv:2306.16962.
+
+\bibitem{chiu2025} A.~Y.~F. Chiu, K.~C. Fung, R.~T.~Y. Li, J.~Li y T.~Lee, ``A large-scale probing analysis of speaker-specific attributes in self-supervised speech representations,'' 2025. arXiv:2501.05310.
+
+\bibitem{fathan2024} A.~Fathan y J.~Alam, ``An analytic study on clustering driven self-supervised speaker verification,'' \emph{Pattern Recognition Letters}, vol.~179, pp.~80--86, 2024. doi:10.1016/j.patrec.2024.01.024.
+
+\bibitem{fujita2019} Y.~Fujita \emph{et al.}, ``End-to-end neural speaker diarization with self-attention,'' 2019. arXiv:1909.06247.
+
+\bibitem{han2024} J.~Han \emph{et al.}, ``Leveraging self-supervised learning for speaker diarization,'' 2024. arXiv:2409.09408.
+
+\bibitem{han2025} J.~Han \emph{et al.}, ``Efficient and robust speaker diarization via structured pruning of self-supervised models,'' 2025. arXiv:2506.18623.
+
+\bibitem{kinoshita2020} K.~Kinoshita \emph{et al.}, ``Integrating end-to-end neural and clustering-based diarization: getting the best of both worlds,'' 2020. arXiv:2010.13366.
+
+\bibitem{koluguri2021} N.~R. Koluguri \emph{et al.}, ``TitaNet: neural model for speaker representation with 1D depth-wise separable convolutions and global context,'' 2021. arXiv:2110.04410.
+
+\bibitem{landini2022} F.~Landini \emph{et al.}, ``Bayesian HMM clustering of x-vector sequences (VBx) in speaker diarization: theory, implementation and analysis on standard tasks,'' \emph{Computer Speech \& Language}, 2022. arXiv:2012.14952.
+
+\bibitem{nemotron2026} NVIDIA, ``Nemotron 3 Diarization,'' ficha del modelo en Hugging Face, 2026. https://huggingface.co/nvidia/Nemotron-3-Diarization.
+
+\bibitem{park2022} T.~J. Park \emph{et al.}, ``Multi-scale speaker diarization with dynamic scale weighting,'' 2022. arXiv:2203.15974.
+
+\bibitem{park2024} T.~Park \emph{et al.}, ``Sortformer: a novel approach for permutation-resolved speaker supervision in speech-to-text systems,'' 2024. arXiv:2409.06656.
+
+\bibitem{plaquet2023} A.~Plaquet y H.~Bredin, ``Powerset multi-class cross entropy loss for neural speaker diarization,'' en \emph{Proc. Interspeech}, 2023. arXiv:2310.13025.
+
+\bibitem{polok2024} A.~Polok \emph{et al.}, ``DiCoW: diarization-conditioned Whisper for target speaker automatic speech recognition,'' 2024. arXiv:2501.00114.
+
+\bibitem{radford2023} A.~Radford \emph{et al.}, ``Robust speech recognition via large-scale weak supervision,'' en \emph{Proc. ICML}, 2023. arXiv:2212.04356.
+
+\bibitem{raghav2026} N.~Raghav, ``DiariZen explained: a tutorial for the open source state-of-the-art speaker diarization pipeline,'' 2026. arXiv:2604.21507.
+
+\bibitem{raj2019} D.~Raj \emph{et al.}, ``Probing the information encoded in x-vectors,'' 2019. arXiv:1909.06351.
+
+\bibitem{ravanelli2018} M.~Ravanelli y Y.~Bengio, ``Speaker recognition from raw waveform with SincNet,'' 2018. arXiv:1808.00158.
+
+\bibitem{saengthong2025} P.~Saengthong \emph{et al.}, ``A unified speech LLM for diarization and speech recognition in multilingual conversations,'' 2025. arXiv:2507.02927.
+
+\bibitem{speakerlm2025} ``SpeakerLM: end-to-end versatile speaker diarization and recognition with multimodal large language models,'' 2025. arXiv:2508.06372.
+
+\bibitem{streaming2025} ``Streaming Sortformer: speaker cache-based online speaker diarization with arrival-time ordering,'' 2025. arXiv:2507.18446.
+
+\bibitem{wang2023} H.~Wang \emph{et al.}, ``WeSpeaker: a research and production oriented speaker embedding learning toolkit,'' en \emph{Proc. IEEE ICASSP}, 2023. arXiv:2210.17016.
+
+\bibitem{wang2024dlm} Q.~Wang \emph{et al.}, ``DiarizationLM: speaker diarization post-processing with large language models,'' 2024. arXiv:2401.03506.
+
+\bibitem{yang2025} Y.~Yang, T.~Thebaud y N.~Dehak, ``Demographic attributes prediction from speech using WavLM embeddings,'' 2025. arXiv:2502.12007.
+
+\bibitem{zuluagagomez2023} J.~Zuluaga-Gomez \emph{et al.}, ``CommonAccent: exploring large acoustic pretrained models for accent classification based on Common Voice,'' 2023. arXiv:2305.18283.
+
+\end{thebibliography}
+
+\end{document}
