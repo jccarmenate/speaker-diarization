@@ -34,7 +34,7 @@ Los PDF de este banco están en [`pdfs/5-evaluacion-y-datos/`](pdfs/5-evaluacion
 ### 2.2 DIHARD III
 - Referencia: Neville Ryant, Prachi Singh, Venkat Krishnamohan, Rajat Varma, Kenneth Church, Christopher Cieri, Jun Du, Sriram Ganapathy et al. (2020). "The Third DIHARD Diarization Challenge". arXiv. arXiv: https://arxiv.org/abs/2012.01477.
 - Qué hace: Tercer reto DIHARD con once dominios difíciles (clínico, restaurante, YouTube, entre otros).
-- Relevancia para DASR: Benchmark exigente en el que pyannote reporta su DER (tabla de la diapositiva 27 del PPT v2).
+- Relevancia para DASR: Benchmark exigente en el que pyannote reporta su DER (tabla de la diapositiva 27 de la presentación).
 - Etiquetas: [tipo: dataset y reto] [idioma: inglés y otros] [acceso: licencia LDC] [relevancia: media]
 - PDF: [2.02-Ryant-2020-The-Third-DIHARD-Diarization-Challenge.pdf](pdfs/5-evaluacion-y-datos/2.02-Ryant-2020-The-Third-DIHARD-Diarization-Challenge.pdf)
 
