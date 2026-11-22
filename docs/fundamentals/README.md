@@ -1,8 +1,8 @@
-# Estado del arte y marco teórico: proyecto DASR
+# Marco teórico: proyecto DASR
 
 **Reconocimiento automático del habla y diarización de hablantes: del audio a la transcripción por hablante y al análisis de atributos vocales.**
 
-Este documento desarrolla por escrito la presentación *DASR – marco teórico* del equipo. Sigue su mismo orden (cinco bloques, tres fases de diarización), amplía la explicación de cada diapositiva a partir de sus notas y añade lo que el formato de presentación no permite: más contexto, ejemplos resueltos, la correspondencia con el código de pyannote y el panorama de alternativas.
+Este documento desarrolla por escrito la presentación *DASR – marco teórico* del equipo ([`presentation/`](../presentation/)). La revisión bibliográfica completa, con fichas por trabajo y los PDF, está en [`state_of_the_art/`](../state_of_the_art/). Sigue su mismo orden (cinco bloques, tres fases de diarización), amplía la explicación de cada diapositiva a partir de sus notas y añade lo que el formato de presentación no permite: más contexto, ejemplos resueltos, la correspondencia con el código de pyannote y el panorama de alternativas.
 
 ## La idea en una frase
 
