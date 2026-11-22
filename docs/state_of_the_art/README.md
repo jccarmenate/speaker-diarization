@@ -34,3 +34,18 @@ The workbook has three sheets, each with a distinct role:
 1. Start with the **Codebook** to understand what each column means and when to mark ✓ or ✗.
 2. Read the **Matriz** to compare papers across RQ1–RQ4, techniques, and evaluation metrics.
 3. Check the **Evidencia** to verify each ✓ using its supporting quote and page number.
+
+## Reference banks
+
+Besides the paper and its matrix, this folder holds a reference review organised in five banks (written in Spanish). Each entry gives the full reference, what the work does, why it matters for DASR and its relevance.
+
+| File | Description |
+|---|---|
+| [`sintesis.md`](sintesis.md) | Synthesis: answers to the starting questions, baselines, notes on the pyannote 3.1.1 code, transferable ideas, gaps and a reading path. |
+| [`1-diarizacion.md`](1-diarizacion.md) | Speaker diarization systems (27 entries). |
+| [`2-representaciones-y-clustering.md`](2-representaciones-y-clustering.md) | Speaker embeddings, self-supervised models and clustering (22 entries). |
+| [`3-asr-y-atribucion.md`](3-asr-y-atribucion.md) | ASR, forced alignment and joint ASR + diarization (17 entries). |
+| [`4-atributos-vocales.md`](4-atributos-vocales.md) | Vocal attributes: age, sex, accent, acoustic features and bias (14 entries). |
+| [`5-evaluacion-y-datos.md`](5-evaluacion-y-datos.md) | Metrics and datasets, including Spanish data (13 entries). |
+| [`matriz-bancos-DASR.xlsx`](matriz-bancos-DASR.xlsx) | Matrix of 16 DASR criteria against 26 key works, with a codebook, an evidence sheet and 12 project decisions. |
+| [`pdfs/`](pdfs/) | Local copies of 79 open-access papers; [`pdfs/INDICE.md`](pdfs/INDICE.md) maps each entry to its file and lists the 11 to download manually. |
