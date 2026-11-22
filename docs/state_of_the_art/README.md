@@ -6,8 +6,8 @@ This directory contains the systematic literature review that supports the desig
 
 | File | Description |
 |---|---|
-| `state_of_the_art.pdf` | Literature review covering ASR, speaker diarization, and vocal attribute analysis. |
-| `state_of_the_art.tex` | LaTeX source of the literature review. The compiled PDF is `state_of_the_art.pdf`. |
+| `state-of-the-art.pdf` | Literature review covering ASR, speaker diarization, and vocal attribute analysis. |
+| `state-of-the-art.tex` | LaTeX source of the literature review. The compiled PDF is `state-of-the-art.pdf`. |
 | `sota.xlsx` | Comparative matrix of the reviewed papers. |
 
 ## SOTA
